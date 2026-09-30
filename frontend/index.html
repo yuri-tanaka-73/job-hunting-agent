@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>就活メモ整理</title>
+  <style>
+    /* ─── リセット・ベース ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:   #2563eb;
+      --primary-h: #1d4ed8;
+      --bg:        #f8fafc;
+      --surface:   #ffffff;
+      --border:    #e2e8f0;
+      --text:      #1e293b;
+      --muted:     #64748b;
+      --danger:    #ef4444;
+      --success:   #22c55e;
+      --radius:    12px;
+      --shadow:    0 1px 4px rgba(0,0,0,.08);
+    }
+
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* ─── レイアウト ──────────────────────────────────────────────────── */
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+    header .subtitle { font-size: 0.75rem; opacity: .8; }
+
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px 16px 80px;
+    }
+
+    /* ─── カード ──────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 14px;
+    }
+
+    /* ─── フォーム ──────────────────────────────────────────────────── */
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; }
+    input[type="text"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+      background: #fff;
+      color: var(--text);
+      transition: border-color .15s;
+      outline: none;
+    }
+    input[type="text"]:focus,
+    select:focus,
+    textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+
+    textarea#memo-text {
+      min-height: 140px;
+      resize: vertical;
+    }
+
+    .form-row { display: flex; gap: 12px; margin-top: 12px; }
+    .form-row > div { flex: 1; }
+
+    /* ─── ボタン ──────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, opacity .15s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-h); }
+    .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+    .btn-danger { background: #fee2e2; color: var(--danger); }
+    .btn-danger:hover { background: #fecaca; }
+
+    .submit-row {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* ─── スピナー ──────────────────────────────────────────────────── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── 通知バー ──────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 20px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 22px;
+      border-radius: 24px;
+      font-size: 0.9rem;
+      transition: transform .3s ease;
+      z-index: 200;
+      pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.error { background: var(--danger); }
+    #toast.success { background: var(--success); }
+
+    /* ─── フィルタバー ──────────────────────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .filter-bar input,
+    .filter-bar select {
+      flex: 1;
+      min-width: 120px;
+      padding: 8px 10px;
+      font-size: 0.88rem;
+    }
+    .filter-bar .btn { flex-shrink: 0; }
+
+    /* ─── メモカード一覧 ────────────────────────────────────────────── */
+    #memo-list { margin-top: 4px; }
+
+    .memo-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      transition: box-shadow .15s;
+    }
+    .memo-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+
+    .memo-card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .memo-company {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+      flex: 1;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: #dbeafe;
+      color: #1e40af;
+      white-space: nowrap;
+    }
+    .badge-category { background: #f0fdf4; color: #166534; }
+
+    .memo-date { font-size: 0.78rem; color: var(--muted); }
+
+    .memo-summary {
+      font-size: 0.88rem;
+      color: #334155;
+      white-space: pre-line;
+      line-height: 1.7;
+      border-left: 3px solid #bfdbfe;
+      padding-left: 10px;
+      margin: 8px 0;
+    }
+
+    .memo-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 6px;
+    }
+    .tag {
+      font-size: 0.75rem;
+      background: #f1f5f9;
+      color: var(--muted);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .memo-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    /* ─── 詳細モーダル ──────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 640px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+      position: relative;
+    }
+    .modal-close {
+      position: absolute;
+      top: 14px; right: 16px;
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal h2 { font-size: 1.1rem; margin-bottom: 14px; padding-right: 28px; }
+
+    .detail-section { margin-bottom: 18px; }
+    .detail-section h3 {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .detail-section pre {
+      font-family: inherit;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.9rem;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      line-height: 1.7;
+    }
+
+    /* ─── 空状態 ────────────────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.95rem; }
+
+    /* ─── ローディング ──────────────────────────────────────────────── */
+    .loading {
+      text-align: center;
+      padding: 32px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    /* ─── スマホ対応 ────────────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .form-row { flex-direction: column; }
+      .filter-bar { flex-direction: column; }
+      .filter-bar input,
+      .filter-bar select { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── ヘッダー ──────────────────────────────────────────────────────── -->
+<header>
+  <div>
+    <h1>📝 就活メモ整理</h1>
+    <div class="subtitle">テキスト入力 → AI要約 → スプレッドシート保存</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ─── 登録フォーム ─────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">✏️ メモを登録</div>
+    <form id="memo-form">
+      <label for="memo-text">メモ本文 <span style="color:var(--danger)">*</span></label>
+      <textarea
+        id="memo-text"
+        placeholder="説明会のメモ、面接の感想、企業研究のメモなど、テキストをそのままコピペしてください。&#10;AIが自動で企業名・カテゴリ・要約を生成します。"
+        required
+      ></textarea>
+
+      <div class="form-row">
+        <div>
+          <label for="company-hint">企業名（任意）</label>
+          <input type="text" id="company-hint" placeholder="例: 株式会社○○（省略でAIが推定）" />
+        </div>
+        <div>
+          <label for="category-hint">カテゴリ（任意）</label>
+          <select id="category-hint">
+            <option value="">AI自動分類</option>
+            <option>企業研究</option>
+            <option>説明会</option>
+            <option>OB訪問</option>
+            <option>ES・履歴書</option>
+            <option>面接</option>
+            <option>選考結果</option>
+            <option>その他</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="submit-row">
+        <button type="submit" class="btn btn-primary" id="submit-btn">
+          <span class="spinner" id="spinner"></span>
+          <span id="submit-label">🤖 AIで分析して保存</span>
+        </button>
+        <span id="form-status" style="font-size:0.85rem;color:var(--muted)"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- ─── 一覧 ────────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">📋 保存済みメモ一覧</div>
+
+    <div class="filter-bar">
+      <input type="text" id="filter-company" placeholder="🔍 企業名で絞り込み" />
+      <select id="filter-category">
+        <option value="">すべてのカテゴリ</option>
+        <option>企業研究</option>
+        <option>説明会</option>
+        <option>OB訪問</option>
+        <option>ES・履歴書</option>
+        <option>面接</option>
+        <option>選考結果</option>
+        <option>その他</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="loadMemos()">更新</button>
+    </div>
+
+    <div id="memo-list">
+      <div class="loading">読み込み中...</div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ─── 詳細モーダル ──────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <button class="modal-close" onclick="closeModal()" aria-label="閉じる">✕</button>
+    <h2 id="modal-title">メモ詳細</h2>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- ─── トースト ──────────────────────────────────────────────────────── -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  // ─── 設定 ────────────────────────────────────────────────────────────
+  const API_BASE = "http://localhost:8000/api/v1";
+
+  // ─── 状態 ────────────────────────────────────────────────────────────
+  let allMemos = [];
+  let currentMemoId = null;
+
+  // ─── 初期化 ──────────────────────────────────────────────────────────
+  document.addEventListener("DOMContentLoaded", () => {
+    loadMemos();
+
+    // フィルタリアルタイム
+    document.getElementById("filter-company").addEventListener("input", renderList);
+    document.getElementById("filter-category").addEventListener("change", renderList);
+
+    // フォーム送信
+    document.getElementById("memo-form").addEventListener("submit", handleSubmit);
+  });
+
+  // ─── メモ一覧読み込み ─────────────────────────────────────────────────
+  async function loadMemos() {
+    const list = document.getElementById("memo-list");
+    list.innerHTML = '<div class="loading">読み込み中...</div>';
+    try {
+      const res = await fetch(`${API_BASE}/memos?limit=200`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      allMemos = data.items || [];
+      renderList();
+    } catch (e) {
+      console.error(e);
+      list.innerHTML = `<div class="empty-state">
+        <div class="icon">⚠️</div>
+        <p>一覧の取得に失敗しました。<br>サーバーが起動しているか確認してください。</p>
+      </div>`;
+    }
+  }
+
+  // ─── フィルタリング・描画 ──────────────────────────────────────────────
+  function renderList() {
+    const companyQ = document.getElementById("filter-company").value.toLowerCase();
+    const categoryQ = document.getElementById("filter-category").value;
+
+    const filtered = allMemos.filter(m => {
+      const matchCompany = !companyQ || m.company_name.toLowerCase().includes(companyQ);
+      const matchCategory = !categoryQ || m.category === categoryQ;
+      return matchCompany && matchCategory;
+    });
+
+    const list = document.getElementById("memo-list");
+
+    if (filtered.length === 0) {
+      list.innerHTML = `<div class="empty-state">
+        <div class="icon">📭</div>
+        <p>メモが見つかりません。<br>上のフォームから登録してください。</p>
+      </div>`;
+      return;
+    }
+
+    list.innerHTML = filtered.map(memo => `
+      <div class="memo-card" id="card-${memo.id}">
+        <div class="memo-card-header">
+          <span class="memo-company">${esc(memo.company_name)}</span>
+          <span class="badge badge-category">${esc(memo.category)}</span>
+          <span class="memo-date">${formatDate(memo.created_at)}</span>
+        </div>
+        <div class="memo-summary">${esc(memo.summary || "（要約なし）")}</div>
+        ${memo.tags.length ? `
+          <div class="memo-tags">
+            ${memo.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}
+          </div>` : ""}
+        <div class="memo-card-footer">
+          <button class="btn btn-sm" onclick="openModal('${memo.id}')" style="background:#f1f5f9">詳細</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteMemo('${memo.id}')">削除</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  // ─── フォーム送信（登録）──────────────────────────────────────────────
+  async function handleSubmit(e) {
+    e.preventDefault();
+
+    const rawText = document.getElementById("memo-text").value.trim();
+    const companyHint = document.getElementById("company-hint").value.trim();
+    const categoryHint = document.getElementById("category-hint").value;
+
+    if (!rawText) return;
+
+    setLoading(true);
+
+    try {
+      const payload = { raw_text: rawText };
+      if (companyHint) payload.company_name = companyHint;
+      if (categoryHint) payload.category = categoryHint;
+
+      const res = await fetch(`${API_BASE}/memos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      const saved = await res.json();
+
+      // フォームリセット
+      document.getElementById("memo-form").reset();
+      document.getElementById("form-status").textContent = "";
+
+      showToast(`✅ 保存しました（${saved.company_name} / ${saved.category}）`, "success");
+
+      // 先頭に追加して再描画
+      allMemos.unshift(saved);
+      renderList();
+
+    } catch (e) {
+      console.error(e);
+      showToast(`❌ 保存に失敗しました: ${e.message}`, "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ─── 削除 ──────────────────────────────────────────────────────────
+  async function deleteMemo(id) {
+    if (!confirm("このメモを削除しますか？")) return;
+    try {
+      const res = await fetch(`${API_BASE}/memos/${id}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+      allMemos = allMemos.filter(m => m.id !== id);
+      renderList();
+      showToast("🗑️ 削除しました", "success");
+    } catch (e) {
+      showToast(`❌ 削除に失敗しました: ${e.message}`, "error");
+    }
+  }
+
+  // ─── 詳細モーダル ────────────────────────────────────────────────────
+  function openModal(id) {
+    const memo = allMemos.find(m => m.id === id);
+    if (!memo) return;
+    currentMemoId = id;
+
+    document.getElementById("modal-title").textContent =
+      `${memo.company_name}  /  ${memo.category}`;
+
+    document.getElementById("modal-body").innerHTML = `
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">
+        登録日: ${formatDate(memo.created_at)}
+        ${memo.memo_date ? ` ／ メモ日付: ${memo.memo_date}` : ""}
+      </div>
+
+      ${memo.tags.length ? `
+        <div class="detail-section">
+          <h3>タグ</h3>
+          <div class="memo-tags">
+            ${memo.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}
+          </div>
+        </div>` : ""}
+
+      <div class="detail-section">
+        <h3>📝 AIによる要約</h3>
+        <pre>${esc(memo.summary || "（なし）")}</pre>
+      </div>
+
+      <div class="detail-section">
+        <h3>📄 元のメモ</h3>
+        <pre>${esc(memo.raw_text)}</pre>
+      </div>
+    `;
+
+    document.getElementById("modal-overlay").classList.add("open");
+    document.querySelector(".modal").focus();
+  }
+
+  function closeModal(e) {
+    if (e && e.target !== document.getElementById("modal-overlay") && !e.target.classList.contains("modal-close")) return;
+    if (!e) {
+      document.getElementById("modal-overlay").classList.remove("open");
+      return;
+    }
+    document.getElementById("modal-overlay").classList.remove("open");
+  }
+
+  // Escキーでモーダルを閉じる
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") document.getElementById("modal-overlay").classList.remove("open");
+  });
+
+  // ─── UI ヘルパー ─────────────────────────────────────────────────────
+  function setLoading(flag) {
+    const btn = document.getElementById("submit-btn");
+    const spinner = document.getElementById("spinner");
+    const label = document.getElementById("submit-label");
+    const status = document.getElementById("form-status");
+
+    btn.disabled = flag;
+    spinner.style.display = flag ? "block" : "none";
+    label.textContent = flag ? "AIが分析中..." : "🤖 AIで分析して保存";
+    status.textContent = flag ? "AIが要約を生成しています（10〜20秒）..." : "";
+  }
+
+  let toastTimer = null;
+  function showToast(msg, type = "") {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.className = "show " + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = ""; }, 3500);
+  }
+
+  function esc(str) {
+    return String(str ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
+  }
+</script>
+</body>
+</html>

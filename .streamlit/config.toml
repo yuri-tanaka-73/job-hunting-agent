@@ -1,0 +1,26 @@
+[logger]
+# Streamlit のログレベルを INFO に設定する。
+# PowerShell に [Sheets] プレフィックス付きのログが出力されるようになる。
+# デバッグ時は "debug" に変更すると詳細ログが表示される。
+level = "info"
+
+[server]
+# ── スマホ（LAN内の別デバイス）からの接続安定化 ──────────────────────────
+# 症状: PCブラウザでは開けるが、スマホでは "CONNECTING" のまま進まない。
+# 原因: 既定では XSRF/CORS 保護と WebSocket 圧縮が有効。LAN内の別デバイス
+#       （別オリジン/別IP）からアクセスすると、一部スマホブラウザで
+#       Cookie が WebSocket ハンドシェイクに乗らず接続確立に失敗したり、
+#       圧縮フレームの相性で接続が確立できないことがある。
+# 方針: 同一ネットワーク内での個人利用を前提に、接続確立を最優先する設定。
+
+# WebSocket の圧縮を無効化（スマホ/断続的な回線での接続確立を安定させる）
+enableWebsocketCompression = false
+
+# LAN内の別オリジン（http://<PCのIP>:8501）からのアクセスを許可するため、
+# CORS と XSRF 保護を無効化する。両者はセットで無効化しないと片方が無視される。
+# 注意: これはインターネット公開向けではなく、信頼できるLAN内利用を想定した設定。
+enableCORS = false
+enableXsrfProtection = false
+
+# ファイル監視を無効化（省リソース化。スマホ接続時の安定性にも寄与）
+fileWatcherType = "none"
