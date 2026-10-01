@@ -60,6 +60,13 @@ GOOGLE_SERVICE_ACCOUNT_JSON=./service_account.json
 GOOGLE_SPREADSHEET_ID=1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
+> **`GOOGLE_SERVICE_ACCOUNT_JSON` は 2 通りの指定方法があります**
+> - **ローカル開発**: サービスアカウント鍵 JSON ファイルの**パス**を指定します（上記のとおり）。
+> - **Render などのデプロイ環境**: 鍵 JSON の**中身そのもの**を 1 行で指定します（ファイル不要）。
+>   詳しくは下記「[Render へのデプロイ](#render-へのデプロイ)」を参照してください。
+>
+> 環境変数に JSON の中身（`{...}`）が入っていればそちらを優先し、なければパス指定のファイルを読み込みます。両方とも無い場合のみエラーになります。
+
 ---
 
 ### 4. 依存パッケージのインストール
@@ -144,6 +151,69 @@ uv run uvicorn app.main:app --reload --port 8000
 | `PATCH` | `/api/v1/memos/{id}` | メモ更新 |
 | `DELETE` | `/api/v1/memos/{id}` | メモ削除 |
 | `GET` | `/health` | サーバー死活確認 |
+
+---
+
+## Render へのデプロイ
+
+Render などファイルを配置できない環境では、`service_account.json` ファイルを置く代わりに、
+**鍵 JSON の中身そのもの**を環境変数 `GOOGLE_SERVICE_ACCOUNT_JSON` に設定します。
+アプリは環境変数に JSON の中身（`{...}`）があればそれを優先して認証します（ファイル不要）。
+
+> `service_account.json` と `.env` は `.gitignore` 済みで、リポジトリにはコミットされません。
+> デプロイ環境では GitHub に秘密情報を含めず、Render の環境変数に設定します。
+
+### 1. サービス作成
+
+1. [Render](https://render.com/) にログインし、**New +** → **Web Service** を選択
+2. このリポジトリ（GitHub）を接続
+
+### 2. ビルド & 起動コマンド
+
+- **Build Command**:
+  ```bash
+  pip install uv && uv sync
+  ```
+- **Start Command**（`$PORT` は Render が自動で割り当てます）:
+  ```bash
+  uv run streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0
+  ```
+
+### 3. 環境変数（Environment Variables）
+
+Render の **Environment** タブで次の 3 つを設定します。
+
+| Key | Value | 説明 |
+|-----|-------|------|
+| `GEMINI_API_KEY` | `AIza...` | Gemini API キー |
+| `GOOGLE_SPREADSHEET_ID` | `1xxxx...` | スプレッドシート ID |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | `{"type":"service_account", ...}` | **鍵 JSON の中身そのもの** |
+
+`GOOGLE_SERVICE_ACCOUNT_JSON` には、ダウンロードした鍵 JSON ファイルの**中身全体**を貼り付けます。
+ローカルの `service_account.json` をテキストエディタで開き、`{` から `}` までをそのままコピーして貼り付けてください。
+
+```
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"your-project","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"xxx@xxx.iam.gserviceaccount.com", ... }
+```
+
+> **改行（`private_key`）について**
+> `private_key` の値には `\n`（バックスラッシュ + n）がそのまま含まれています。JSON の文字列としては
+> これが正しい形です。鍵 JSON をそのまま 1 つの値として貼り付ければ問題ありません（手動で改行を
+> 展開する必要はありません）。
+
+### 4. スプレッドシートの共有を忘れずに
+
+鍵 JSON 内の `client_email`（`xxx@xxx.iam.gserviceaccount.com`）に対して、
+対象スプレッドシートを **編集者** 権限で共有してください（ローカルと同じ手順です）。
+
+### 5. デプロイ
+
+設定を保存するとデプロイが始まります。完了後、Render が払い出す URL
+（例: `https://your-app.onrender.com`）にアクセスするとアプリが開きます。
+
+> 認証に失敗する場合は、Render のログで `[Sheets] 認証成功（環境変数）` が出力されているか確認してください。
+> このログが出ていれば環境変数の JSON が正しく読み込まれています。`FileNotFoundError` が出る場合は
+> `GOOGLE_SERVICE_ACCOUNT_JSON` が未設定、または JSON が壊れている（`{` で始まっていない）可能性があります。
 
 ---
 

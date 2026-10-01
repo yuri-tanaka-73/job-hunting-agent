@@ -130,31 +130,13 @@ class SheetsService:
         self._last_col = last_col
 
         self._spreadsheet_id = spreadsheet_id or settings.google_spreadsheet_id
-        creds_path = Path(credentials_path or settings.google_service_account_json)
 
         logger.info("[Sheets] 接続開始 memo_type=%s sheet=%s 列数=%d",
                     memo_type, self._sheet_name, self._n_total)
         logger.info("[Sheets] spreadsheet_id = %s", self._spreadsheet_id)
-        logger.info("[Sheets] credentials_path = %s", creds_path.resolve())
 
-        if not creds_path.exists():
-            msg = (
-                f"service_account.json が見つかりません: {creds_path.resolve()}\n"
-                f"ヒント: .env の GOOGLE_SERVICE_ACCOUNT_JSON を確認してください。"
-            )
-            logger.error("[Sheets] %s", msg)
-            raise FileNotFoundError(msg)
-        logger.info("[Sheets] service_account.json を確認しました ✓")
-
-        try:
-            creds = service_account.Credentials.from_service_account_file(
-                str(creds_path), scopes=_SCOPES
-            )
-            self._creds = creds
-            logger.info("[Sheets] 認証成功: %s", creds.service_account_email)
-        except Exception:
-            logger.error("[Sheets] 認証失敗:\n%s", traceback.format_exc())
-            raise
+        creds = self._load_credentials(credentials_path)
+        self._creds = creds
 
         try:
             self._service = build("sheets", "v4", credentials=creds, cache_discovery=False)
@@ -170,6 +152,79 @@ class SheetsService:
 
         self._ensure_sheet_exists()
         self._ensure_header()
+
+    # ─── 認証情報のロード ──────────────────────────────────────────────────────
+
+    def _load_credentials(self, credentials_path: str | None):
+        """サービスアカウント認証情報をロードする。
+
+        優先順位:
+          1. 環境変数 GOOGLE_SERVICE_ACCOUNT_JSON（json.loads() で辞書化）
+             → Render など、ファイルを置けない環境向け
+          2. ./service_account.json ファイル
+             → ローカル開発向け（従来どおり）
+
+        credentials_path 引数が渡された場合は、そのファイルを強制使用する（テスト用）。
+        1・2 のどちらも使えない場合のみ FileNotFoundError を送出する。
+        """
+        # ── テスト/デバッグ用: 明示パスが渡された場合 ─────────────────────────
+        if credentials_path:
+            creds_path = Path(credentials_path)
+            logger.info("[Sheets] 認証方式: 明示パス指定 (%s)", creds_path.resolve())
+            if not creds_path.exists():
+                raise FileNotFoundError(
+                    f"指定されたサービスアカウントファイルが見つかりません: {creds_path.resolve()}"
+                )
+            return self._creds_from_file(creds_path)
+
+        # ── 優先度 1: 環境変数 GOOGLE_SERVICE_ACCOUNT_JSON（JSON 文字列）──────
+        info = settings.service_account_info()
+        if info is not None:
+            logger.info("[Sheets] 認証方式: 環境変数 GOOGLE_SERVICE_ACCOUNT_JSON")
+            try:
+                creds = service_account.Credentials.from_service_account_info(
+                    info, scopes=_SCOPES
+                )
+                logger.info(
+                    "[Sheets] 認証成功（環境変数）: %s", creds.service_account_email
+                )
+                return creds
+            except Exception:
+                logger.error(
+                    "[Sheets] 環境変数 GOOGLE_SERVICE_ACCOUNT_JSON の JSON からの認証失敗:\n%s",
+                    traceback.format_exc(),
+                )
+                raise
+
+        # ── 優先度 2: ./service_account.json ファイル（ローカル開発）────────
+        fallback_path = Path("./service_account.json")
+        if fallback_path.exists():
+            logger.info("[Sheets] 認証方式: service_account.json (%s)", fallback_path.resolve())
+            return self._creds_from_file(fallback_path)
+
+        # ── どちらも使えない → 明確なエラーメッセージで終了 ─────────────────
+        msg = (
+            "Google サービスアカウント認証情報が見つかりません。\n"
+            "次のいずれかを設定してください:\n"
+            "  (A) Render 等のデプロイ環境:\n"
+            "      環境変数 GOOGLE_SERVICE_ACCOUNT_JSON に鍵 JSON の中身を直接設定\n"
+            '      例: GOOGLE_SERVICE_ACCOUNT_JSON=\'{"type":"service_account",...}\'\n'
+            "  (B) ローカル開発環境:\n"
+            "      プロジェクトルートに service_account.json を配置"
+        )
+        logger.error("[Sheets] %s", msg)
+        raise FileNotFoundError(msg)
+
+    def _creds_from_file(self, creds_path: Path):
+        try:
+            creds = service_account.Credentials.from_service_account_file(
+                str(creds_path), scopes=_SCOPES
+            )
+            logger.info("[Sheets] 認証成功（ファイル）: %s", creds.service_account_email)
+            return creds
+        except Exception:
+            logger.error("[Sheets] 認証失敗:\n%s", traceback.format_exc())
+            raise
 
     # ─── スレッド安全な実行ヘルパー ────────────────────────────────────────────
 

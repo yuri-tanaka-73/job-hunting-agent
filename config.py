@@ -35,7 +35,12 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.6-flash"
 
     # ─── Google Sheets ────────────────────────────────────────────────────────
-    google_service_account_json: str = "./service_account.json"
+    # GOOGLE_SERVICE_ACCOUNT_JSON:
+    #   - 環境変数に設定する場合は「鍵 JSON の中身そのもの」を指定する
+    #     例: GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account", ...}'
+    #   - 未設定（None）の場合は service_account.json ファイルへフォールバック
+    #   - デフォルトを None にすることで「環境変数が明示設定されたか」を確実に判定できる
+    google_service_account_json: Optional[str] = None
     google_spreadsheet_id: Optional[str] = None
 
     # ─── アプリ共通 ───────────────────────────────────────────────────────────
@@ -49,25 +54,65 @@ class Settings(BaseSettings):
         チェック対象:
           - GEMINI_API_KEY            … 未設定なら AI 分析・OCR が使えない
           - GOOGLE_SPREADSHEET_ID     … 未設定なら保存・一覧ができない
-          - GOOGLE_SERVICE_ACCOUNT_JSON … 指定パスにファイルが無ければ Sheets 認証不可
+          - GOOGLE_SERVICE_ACCOUNT_JSON … 環境変数の JSON 直書き、または
+            service_account.json ファイルのどちらも無ければ Sheets 認証不可
         """
         missing = []
         if not self.gemini_api_key:
             missing.append("GEMINI_API_KEY")
         if not self.google_spreadsheet_id:
             missing.append("GOOGLE_SPREADSHEET_ID")
-        if not self.service_account_exists:
+        if not self.service_account_available:
             missing.append("GOOGLE_SERVICE_ACCOUNT_JSON")
         return missing
 
+    def service_account_info(self) -> Optional[dict]:
+        """環境変数 GOOGLE_SERVICE_ACCOUNT_JSON を JSON として解析して返す。
+
+        - 環境変数が設定されていれば json.loads() で辞書化する。
+        - 未設定（None）または JSON パース失敗の場合は None を返す。
+        """
+        raw = (self.google_service_account_json or "").strip()
+        if not raw:
+            return None
+        import json
+        try:
+            info = json.loads(raw)
+            return info if isinstance(info, dict) else None
+        except (ValueError, TypeError):
+            return None
+
     @property
-    def service_account_exists(self) -> bool:
-        """サービスアカウント JSON が指定パスに実在するか。"""
+    def service_account_file_exists(self) -> bool:
+        """フォールバック用 service_account.json ファイルが存在するか。"""
         from pathlib import Path
         try:
-            return Path(self.google_service_account_json).expanduser().is_file()
+            return Path("./service_account.json").expanduser().is_file()
         except Exception:
             return False
+
+    @property
+    def service_account_available(self) -> bool:
+        """環境変数 JSON またはファイルのどちらかで認証可能か。
+
+        優先順位:
+          1. 環境変数 GOOGLE_SERVICE_ACCOUNT_JSON（JSON 文字列として解析）
+          2. ./service_account.json ファイル
+        """
+        return self.service_account_info() is not None or self.service_account_file_exists
+
+    # 後方互換のためのエイリアス
+    @property
+    def service_account_exists(self) -> bool:
+        return self.service_account_available
+
+    # 旧実装との互換（パス文字列を期待する箇所向け・使用禁止・削除予定）
+    @property
+    def service_account_file_path(self) -> Optional[str]:
+        """後方互換用。JSON 直書きの場合は None を返す。"""
+        if self.google_service_account_json is not None:
+            return None   # 環境変数が設定されているのでファイルパスは不要
+        return "./service_account.json"
 
     @property
     def is_ai_ready(self) -> bool:
@@ -75,7 +120,7 @@ class Settings(BaseSettings):
 
     @property
     def is_sheets_ready(self) -> bool:
-        return bool(self.google_spreadsheet_id) and self.service_account_exists
+        return bool(self.google_spreadsheet_id) and self.service_account_available
 
     @property
     def spreadsheet_url(self) -> Optional[str]:
@@ -128,6 +173,21 @@ class _SettingsProxy:
     @property
     def service_account_exists(self) -> bool:
         return self._get().service_account_exists
+
+    @property
+    def service_account_available(self) -> bool:
+        return self._get().service_account_available
+
+    @property
+    def service_account_file_path(self):
+        return self._get().service_account_file_path
+
+    @property
+    def service_account_file_exists(self) -> bool:
+        return self._get().service_account_file_exists
+
+    def service_account_info(self):
+        return self._get().service_account_info()
 
     @property
     def spreadsheet_url(self):

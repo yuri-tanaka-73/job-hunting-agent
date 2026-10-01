@@ -254,7 +254,8 @@ def show_setup_guide(missing: list[str]) -> None:
             env_lines.append("GEMINI_API_KEY=AIzaxxxxxxxxxxxxxxxxxxxxxxxx  # ← あなたのキーに書き換える")
         elif field == "GOOGLE_SPREADSHEET_ID":
             env_lines.append("GOOGLE_SPREADSHEET_ID=1xxxxxxxxxxxxxxxxxxxx  # ← スプレッドシートIDに書き換える")
-    env_lines.append("GOOGLE_SERVICE_ACCOUNT_JSON=./service_account.json  # ← JSONファイルのパス")
+    env_lines.append("# ↓ ローカル: 鍵JSONファイルのパス / Render等: 鍵JSONの中身を直接貼り付け")
+    env_lines.append("GOOGLE_SERVICE_ACCOUNT_JSON=./service_account.json")
     st.code("\n".join(env_lines), language="bash")
 
     st.divider()
@@ -304,13 +305,16 @@ def show_setup_guide(missing: list[str]) -> None:
     if "GOOGLE_SERVICE_ACCOUNT_JSON" in missing and "GOOGLE_SPREADSHEET_ID" not in missing:
         st.markdown(f"""
 <div class="setup-step">
-<strong>🔐 サービスアカウント JSON が見つかりません</strong><br><br>
-現在の設定パス: <code>{settings.google_service_account_json}</code><br><br>
+<strong>🔐 サービスアカウント認証情報が見つかりません</strong><br><br>
+<strong>ローカル環境の場合（ファイルを使う）：</strong><br>
 1. <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> で <code>Google Sheets API</code> を有効化<br>
 2. サービスアカウントを作成し、「キー」→「JSON」でキーをダウンロード<br>
 3. ダウンロードした JSON を <code>service_account.json</code> としてプロジェクトルートに配置<br>
-（別パスにする場合は <code>.env</code> の <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> を修正）<br>
-4. スプレッドシートの「共有」でサービスアカウントのメールに <strong>編集者</strong> 権限を付与
+（別パスにする場合は <code>.env</code> の <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> にパスを設定）<br>
+4. スプレッドシートの「共有」でサービスアカウントのメールに <strong>編集者</strong> 権限を付与<br><br>
+<strong>Render などのデプロイ環境の場合（ファイルを置かない）：</strong><br>
+環境変数 <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> に、鍵 JSON の<strong>中身そのもの</strong>を設定します：<br>
+<code>GOOGLE_SERVICE_ACCOUNT_JSON={{"type":"service_account", ...}}</code>
 </div>
 """, unsafe_allow_html=True)
 
